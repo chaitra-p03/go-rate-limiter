@@ -3,12 +3,17 @@ package internal
 import (
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 type RatelimiterManager struct {
 	buckets map[string]*Bucket
 	mu      sync.RWMutex
+
+	totalRequests   int64
+	allowedRequests int64
+	deniedRequests  int64
 }
 
 func NewratelimiterManager() *RatelimiterManager {
@@ -18,8 +23,11 @@ func NewratelimiterManager() *RatelimiterManager {
 }
 
 func (rl *RatelimiterManager) Allow(identifier string, capacity, refillRate float64) bool {
+	atomic.AddInt64(&rl.totalRequests, 1)
+
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
+
 	bucket, exists := rl.buckets[identifier]
 	if !exists {
 		bucket = &Bucket{
@@ -30,7 +38,13 @@ func (rl *RatelimiterManager) Allow(identifier string, capacity, refillRate floa
 		}
 		rl.buckets[identifier] = bucket
 	}
-	return bucket.take(1)
+	allowed := bucket.take(1)
+	if allowed {
+		atomic.AddInt64(&rl.allowedRequests, 1)
+	} else {
+		atomic.AddInt64(&rl.deniedRequests, 1)
+	}
+	return allowed
 }
 
 func (rl *RatelimiterManager) GetRemaining(identifier string) float64 {
@@ -62,11 +76,18 @@ func (rl *RatelimiterManager) cleanup(maxIdle time.Duration) {
 	now := time.Now()
 
 	rl.mu.Lock()
-	for identifier, bucker := range rl.buckets {
-
-		if now.Sub(bucker.lastRefillTime) > maxIdle {
+	for identifier, bucket := range rl.buckets {
+		if now.Sub(bucket.lastRefillTime) > maxIdle {
 			delete(rl.buckets, identifier)
 		}
 	}
 	rl.mu.Unlock()
+}
+
+func (r1 *RatelimiterManager) GetStats() Stats {
+	return Stats{
+		Total:   atomic.LoadInt64(&r1.totalRequests),
+		Allowed: atomic.LoadInt64(&r1.allowedRequests),
+		Denied:  atomic.LoadInt64(&r1.deniedRequests),
+	}
 }

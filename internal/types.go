@@ -12,3 +12,8 @@ type CheckResponse struct {
 	Limit      float64 `json:"limit"`
 	RetryAfter float64 `json:"retry_after, omitempty"`
 }
+type Stats struct {
+	Total   int64 `json:"total"`
+	Allowed int64 `json:"allowed"`
+	Denied  int64 `json:"denied"`
+}
