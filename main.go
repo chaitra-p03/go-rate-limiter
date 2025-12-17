@@ -5,13 +5,15 @@ import (
 	"log"
 	"net/http"
 	"rateLimiter/internal"
+	"time"
 )
 
 var limiter *internal.RatelimiterManager
 
 func main() {
 	limiter = internal.NewratelimiterManager()
-
+	// cleanup - runs every 1 min, removes buckets idle for >10mins
+	limiter.StartCleanup(1*time.Minute, 10*time.Minute)
 	http.HandleFunc("/check", handleCheck)
 
 	log.Println("Rate limiter starting on :8080")
@@ -56,5 +58,5 @@ func handleCheck(w http.ResponseWriter, r *http.Request) {
 	if !allowed {
 		w.WriteHeader(http.StatusTooManyRequests)
 	}
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
