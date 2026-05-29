@@ -54,9 +54,9 @@ func handleCheck(w http.ResponseWriter, r *http.Request) {
 	remaining := limiter.GetRemaining(req.Identifier)
 
 	response := internal.CheckResponse{
-		Allowed:   allowed,
+		Allowed: allowed,
 		Remaining: remaining,
-		Limit:     req.Capacity,
+		Limit: req.Capacity,
 	}
 
 	if !allowed {
