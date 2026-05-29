@@ -12,14 +12,21 @@ var limiter *internal.RatelimiterManager
 
 func main() {
 	limiter = internal.NewratelimiterManager()
-	// cleanup - runs every 1 min, removes buckets idle for >10mins
+	// cleanup - runs every 1 min and cleans those idle for >10 mins
 	limiter.StartCleanup(1*time.Minute, 10*time.Minute)
 
-	http.HandleFunc("/check", handleCheck)
-	http.HandleFunc("/stats", statsHandler)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/check", handleCheck)
+	mux.HandleFunc("/stats", statsHandler)
+	mux.HandleFunc("/api/data", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"message": "ok"}`))
+	})
+
+	limited := limiter.Middleware(10, 1)(mux)
 
 	log.Println("Rate limiter starting on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8080", limited))
 }
 func handleCheck(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

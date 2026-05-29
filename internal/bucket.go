@@ -3,9 +3,9 @@ package internal
 import "time"
 
 type Bucket struct {
-	tokens         float64
-	capacity       float64
-	refillRate     float64
+	tokens float64
+	capacity float64
+	refillRate float64
 	lastRefillTime time.Time
 }
 

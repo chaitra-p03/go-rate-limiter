@@ -9,11 +9,11 @@ import (
 
 type RatelimiterManager struct {
 	buckets map[string]*Bucket
-	mu      sync.RWMutex
+	mu sync.RWMutex
 
-	totalRequests   int64
+	totalRequests int64
 	allowedRequests int64
-	deniedRequests  int64
+	deniedRequests int64
 }
 
 func NewratelimiterManager() *RatelimiterManager {
@@ -31,9 +31,9 @@ func (rl *RatelimiterManager) Allow(identifier string, capacity, refillRate floa
 	bucket, exists := rl.buckets[identifier]
 	if !exists {
 		bucket = &Bucket{
-			tokens:         capacity,
-			capacity:       capacity,
-			refillRate:     refillRate,
+			tokens: capacity,
+			capacity: capacity,
+			refillRate: refillRate,
 			lastRefillTime: time.Now(),
 		}
 		rl.buckets[identifier] = bucket
