@@ -7,6 +7,8 @@ type Bucket struct {
 	capacity float64
 	refillRate float64
 	lastRefillTime time.Time
+	allowed int64
+    denied  int64
 }
 
 func (b *Bucket) refill() {
@@ -23,7 +25,9 @@ func (b *Bucket) take(n float64) bool {
 	b.refill()
 	if b.tokens >= n {
 		b.tokens = b.tokens - n
+		b.allowed++
 		return true
 	}
+	b.denied++
 	return false
 }

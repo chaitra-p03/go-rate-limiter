@@ -23,8 +23,13 @@ func main() {
 		w.Write([]byte(`{"message": "ok"}`))
 	})
 
-	limited := limiter.Middleware(10, 1)(mux)
-
+	limited := limiter.Middleware(10, 1)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/stats" {
+			mux.ServeHTTP(w,r)
+			return
+		}
+		mux.ServeHTTP(w,r)
+	}))
 	log.Println("Rate limiter starting on :8080")
 	log.Fatal(http.ListenAndServe(":8080", limited))
 }

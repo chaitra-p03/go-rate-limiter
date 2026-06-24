@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -84,10 +85,33 @@ func (rl *RatelimiterManager) cleanup(maxIdle time.Duration) {
 	rl.mu.Unlock()
 }
 
-func (r1 *RatelimiterManager) GetStats() Stats {
-	return Stats{
-		Total:   atomic.LoadInt64(&r1.totalRequests),
-		Allowed: atomic.LoadInt64(&r1.allowedRequests),
-		Denied:  atomic.LoadInt64(&r1.deniedRequests),
-	}
+func (rl *RatelimiterManager) GetStats() Stats {
+    total := atomic.LoadInt64(&rl.totalRequests)
+    denied := atomic.LoadInt64(&rl.deniedRequests)
+    allowed := atomic.LoadInt64(&rl.allowedRequests)
+
+    rate := 0.0
+    if total > 0 {
+        rate = float64(denied) / float64(total) * 100
+    }
+
+    rl.mu.RLock()
+    clients := make(map[string]ClientStats, len(rl.buckets))
+    for id, b := range rl.buckets {
+        clients[id] = ClientStats{
+            Allowed:       b.allowed,
+            Denied:        b.denied,
+            CurrentTokens: b.tokens,
+        }
+    }
+    rl.mu.RUnlock()
+
+    return Stats{
+        Total:         total,
+        Allowed:       allowed,
+        Denied:        denied,
+        RejectionRate: fmt.Sprintf("%.2f%%", rate),
+        ActiveClients: len(clients),
+        PerClient:     clients,
+    }
 }

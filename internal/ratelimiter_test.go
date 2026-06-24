@@ -70,7 +70,7 @@ func TestConcurrentRequests(t *testing.T) {
 			rl.Allow("user1",100,10)
 		}()
 	}
-	wg.Wait() // passes cleanly only if no race conditions
+	wg.Wait()
 }
 
 func TestIsolatedIdentifiers(t *testing.T) {
