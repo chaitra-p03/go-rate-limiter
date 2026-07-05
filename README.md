@@ -1,4 +1,4 @@
-# Go Token Bucket Rate Limiter
+# Rate Limiter
 
 A concurrency-safe HTTP rate limiter implemented in Go using the Token Bucket algorithm.  
 The server supports per-client rate limiting, automatic token refilling, request statistics and cleanup of inactive clients.
@@ -177,4 +177,4 @@ Test configuration:
 - 100 concurrent clients
 - 25,000+ requests/sec throughput
 
-The benchmark verifies concurrent request handling, token bucket updates, and HTTP response correctness under load.
+The benchmark verifies concurrent request handling, token bucket updates and HTTP response correctness under load.
