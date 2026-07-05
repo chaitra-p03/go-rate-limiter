@@ -10,7 +10,7 @@ type CheckResponse struct {
 	Allowed bool `json:"allowed"`
 	Remaining float64 `json:"remaining"`
 	Limit float64 `json:"limit"`
-	RetryAfter float64 `json:"retry_after, omitempty"`
+	RetryAfter float64 `json:"retry_after,omitempty"`
 }
 type Stats struct {
 	Total int64 `json:"total"`
@@ -22,7 +22,7 @@ type Stats struct {
 
 }
 type ClientStats struct {
-    Allowed       int64   `json:"allowed"`
-    Denied        int64   `json:"denied"`
+    Allowed int64 `json:"allowed"`
+    Denied int64 `json:"denied"`
     CurrentTokens float64 `json:"current_tokens"`
 }

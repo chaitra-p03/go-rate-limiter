@@ -1,0 +1,5 @@
+{
+  "identifier": "test",
+  "capacity": 10,
+  "refill_rate": 1
+}

@@ -1,8 +1,12 @@
 package internal
 
-import "time"
+import (
+	"time"
+	"sync"
+)
 
 type Bucket struct {
+	mu sync.Mutex
 	tokens float64
 	capacity float64
 	refillRate float64
@@ -22,6 +26,8 @@ func (b *Bucket) refill() {
 }
 
 func (b *Bucket) take(n float64) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	b.refill()
 	if b.tokens >= n {
 		b.tokens = b.tokens - n
@@ -30,4 +36,22 @@ func (b *Bucket) take(n float64) bool {
 	}
 	b.denied++
 	return false
+}
+
+func (b *Bucket) remaining() float64 {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.refill()
+	return b.tokens
+}
+
+func (b *Bucket) stats() ClientStats {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.refill()
+	return ClientStats{
+		Allowed: b.allowed,
+		Denied: b.denied,
+		CurrentTokens: b.tokens,
+	}
 }

@@ -27,18 +27,23 @@ func (rl *RatelimiterManager) Allow(identifier string, capacity, refillRate floa
 	atomic.AddInt64(&rl.totalRequests, 1)
 
 	rl.mu.Lock()
-	defer rl.mu.Unlock()
-
 	bucket, exists := rl.buckets[identifier]
 	if !exists {
 		bucket = &Bucket{
-			tokens: capacity,
-			capacity: capacity,
-			refillRate: refillRate,
+			tokens:         capacity,
+			capacity:       capacity,
+			refillRate:     refillRate,
 			lastRefillTime: time.Now(),
 		}
 		rl.buckets[identifier] = bucket
 	}
+	rl.mu.Unlock()
+
+	bucket.mu.Lock()
+	bucket.capacity = capacity
+	bucket.refillRate = refillRate
+	bucket.mu.Unlock()
+
 	allowed := bucket.take(1)
 	if allowed {
 		atomic.AddInt64(&rl.allowedRequests, 1)
@@ -50,14 +55,13 @@ func (rl *RatelimiterManager) Allow(identifier string, capacity, refillRate floa
 
 func (rl *RatelimiterManager) GetRemaining(identifier string) float64 {
 	rl.mu.RLock()
-	defer rl.mu.RUnlock()
-
 	bucket, exists := rl.buckets[identifier]
+	rl.mu.RUnlock()
 	if !exists {
 		return 0
 	}
-	bucket.refill()
-	return bucket.tokens
+	
+	return bucket.remaining()
 }
 
 // cleanup goroutine
@@ -77,12 +81,15 @@ func (rl *RatelimiterManager) cleanup(maxIdle time.Duration) {
 	now := time.Now()
 
 	rl.mu.Lock()
+	defer rl.mu.Unlock()
 	for identifier, bucket := range rl.buckets {
-		if now.Sub(bucket.lastRefillTime) > maxIdle {
+		bucket.mu.Lock()
+		idle := now.Sub(bucket.lastRefillTime) > maxIdle
+		bucket.mu.Unlock()
+		if idle {
 			delete(rl.buckets, identifier)
 		}
 	}
-	rl.mu.Unlock()
 }
 
 func (rl *RatelimiterManager) GetStats() Stats {
@@ -98,20 +105,16 @@ func (rl *RatelimiterManager) GetStats() Stats {
     rl.mu.RLock()
     clients := make(map[string]ClientStats, len(rl.buckets))
     for id, b := range rl.buckets {
-        clients[id] = ClientStats{
-            Allowed:       b.allowed,
-            Denied:        b.denied,
-            CurrentTokens: b.tokens,
-        }
-    }
+	clients[id] = b.stats()
+	}
     rl.mu.RUnlock()
 
     return Stats{
-        Total:         total,
-        Allowed:       allowed,
-        Denied:        denied,
+        Total: total,
+        Allowed: allowed,
+        Denied: denied,
         RejectionRate: fmt.Sprintf("%.2f%%", rate),
         ActiveClients: len(clients),
-        PerClient:     clients,
+        PerClient: clients,
     }
 }

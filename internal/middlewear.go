@@ -12,12 +12,10 @@ func (rl *RatelimiterManager) Middleware(capacity, refillRate float64) func(http
 			if err!=nil {
 				ip=r.RemoteAddr
 			}
-
-			if !rl.Allow(ip, capacity, refillRate) {
+			if !rl.Allow("ip:"+ip, capacity, refillRate) {
 				http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
 				return
 			}
-
 			next.ServeHTTP(w, r)
 		})
 	}
