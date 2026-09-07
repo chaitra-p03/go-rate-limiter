@@ -18,15 +18,11 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/check", handleCheck)
 	mux.HandleFunc("/stats", statsHandler)
-	mux.HandleFunc("/api/data", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"message": "ok"}`))
-	})
-
-	limited := limiter.Middleware(10, 1)(mux)
+	limitedDataHandler := limiter.Middleware(10, 1)(http.HandlerFunc(dataHandler))
+	mux.Handle("/api/data", limitedDataHandler)
 
 	log.Println("Rate limiter starting on :8080")
-	log.Fatal(http.ListenAndServe(":8080", limited))
+	log.Fatal(http.ListenAndServe(":8080", mux))
 }
 
 func handleCheck(w http.ResponseWriter, r *http.Request) {
@@ -59,8 +55,11 @@ if req.Capacity <= 0 || req.RefillRate <= 0 {
     return
 }
 
-	allowed := limiter.Allow("id:"+req.Identifier, req.Capacity, req.RefillRate)
-	remaining := limiter.GetRemaining("id:"+req.Identifier)
+	allowed, remaining := limiter.Allow(
+	"id:"+req.Identifier,
+	req.Capacity,
+	req.RefillRate,
+	)
 
 	response := internal.CheckResponse{
 		Allowed: allowed,
@@ -83,4 +82,8 @@ func statsHandler(w http.ResponseWriter, r *http.Request) {
 	stats := limiter.GetStats()
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(stats)
+}
+func dataHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"message": "ok"}`))
 }

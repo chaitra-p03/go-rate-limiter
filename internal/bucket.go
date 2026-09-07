@@ -25,17 +25,17 @@ func (b *Bucket) refill() {
 	b.lastRefillTime = now
 }
 
-func (b *Bucket) take(n float64) bool {
+func (b *Bucket) take(n float64) (bool, float64) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.refill()
 	if b.tokens >= n {
-		b.tokens = b.tokens - n
+		b.tokens -= n
 		b.allowed++
-		return true
+		return true, b.tokens
 	}
 	b.denied++
-	return false
+	return false, b.tokens
 }
 
 func (b *Bucket) remaining() float64 {

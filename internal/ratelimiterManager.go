@@ -23,11 +23,12 @@ func NewratelimiterManager() *RatelimiterManager {
 	}
 }
 
-func (rl *RatelimiterManager) Allow(identifier string, capacity, refillRate float64) bool {
+func (rl *RatelimiterManager) Allow(identifier string, capacity, refillRate float64) (bool, float64) {
 	atomic.AddInt64(&rl.totalRequests, 1)
 
 	rl.mu.Lock()
 	bucket, exists := rl.buckets[identifier]
+
 	if !exists {
 		bucket = &Bucket{
 			tokens:         capacity,
@@ -37,6 +38,7 @@ func (rl *RatelimiterManager) Allow(identifier string, capacity, refillRate floa
 		}
 		rl.buckets[identifier] = bucket
 	}
+
 	rl.mu.Unlock()
 
 	bucket.mu.Lock()
@@ -44,13 +46,15 @@ func (rl *RatelimiterManager) Allow(identifier string, capacity, refillRate floa
 	bucket.refillRate = refillRate
 	bucket.mu.Unlock()
 
-	allowed := bucket.take(1)
+	allowed, remaining := bucket.take(1)
+
 	if allowed {
 		atomic.AddInt64(&rl.allowedRequests, 1)
 	} else {
 		atomic.AddInt64(&rl.deniedRequests, 1)
 	}
-	return allowed
+
+	return allowed, remaining
 }
 
 func (rl *RatelimiterManager) GetRemaining(identifier string) float64 {
