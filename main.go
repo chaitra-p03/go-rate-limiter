@@ -16,66 +16,12 @@ func main() {
 	limiter.StartCleanup(1*time.Minute, 10*time.Minute)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/check", handleCheck)
 	mux.HandleFunc("/stats", statsHandler)
 	limitedDataHandler := limiter.Middleware(10, 1)(http.HandlerFunc(dataHandler))
 	mux.Handle("/api/data", limitedDataHandler)
 
 	log.Println("Rate limiter starting on :8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))
-}
-
-func handleCheck(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req internal.CheckRequest
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Printf("JSON decode error: %v", err)
-		http.Error(w, "bad request", http.StatusBadRequest)
-		return
-	}
-
-	// Validation
-	if req.Identifier == "" {
-    log.Println("Validation failed: identifier required")
-    http.Error(w, "identifier required", http.StatusBadRequest)
-    return
-}
-if req.Capacity <= 0 || req.RefillRate <= 0 {
-    log.Printf(
-        "Validation failed: capacity=%v refillRate=%v",
-        req.Capacity,
-        req.RefillRate,
-    )
-    http.Error(w, "capacity and refill rate must be positive", http.StatusBadRequest)
-    return
-}
-
-	allowed, remaining := limiter.Allow(
-	"id:"+req.Identifier,
-	req.Capacity,
-	req.RefillRate,
-	)
-
-	response := internal.CheckResponse{
-		Allowed: allowed,
-		Remaining: remaining,
-		Limit: req.Capacity,
-	}
-
-	if !allowed {
-		retryAfter := 1.0 / req.RefillRate
-		response.RetryAfter = retryAfter
-	}
-	w.Header().Set("Content-Type", "application/json")
-	if !allowed {
-		w.WriteHeader(http.StatusTooManyRequests)
-	}
-	_ = json.NewEncoder(w).Encode(response)
 }
 
 func statsHandler(w http.ResponseWriter, r *http.Request) {
