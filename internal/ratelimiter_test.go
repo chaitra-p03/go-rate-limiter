@@ -2,6 +2,7 @@ package internal
 
 import (
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -64,17 +65,29 @@ func TestCleanupRemovesIdleBuckets(t *testing.T) {
 	}
 }
 
-func TestConcurrentRequests(t *testing.T) {
+func TestConcurrentRequestsRespectCapacity(t *testing.T) {
 	rl := NewratelimiterManager()
 	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
+	var allowedCount int64
+	for i := 0; i < 150; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			rl.Allow("user1", 100, 10)
+			allowed, _ := rl.Allow("user1", 100, 0)
+			if allowed {
+				atomic.AddInt64(&allowedCount, 1)
+			}
 		}()
 	}
+
 	wg.Wait()
+	if allowedCount != 100 {
+		t.Fatalf("expected 100 allowed requests, got %d", allowedCount)
+	}
+	deniedCount := int64(150) - allowedCount
+	if deniedCount != 50 {
+		t.Fatalf("expected 50 denied requests, got %d", deniedCount)
+	}
 }
 
 func TestIsolatedIdentifiers(t *testing.T) {
