@@ -1,19 +1,23 @@
 package internal
 
 import (
+	"context"
 	"sync"
 	"time"
 )
 
-// Store describes the operations the rate limiter needs from storage.
 type Store interface {
-	Allow(identifier string, capacity, refillRate float64) (bool, float64)
+	Allow(
+		ctx context.Context,
+		identifier string,
+		capacity, refillRate float64,
+	) (bool, float64, error)
+
 	GetRemaining(identifier string) float64
 	Cleanup(maxIdle time.Duration)
 	Snapshot() map[string]ClientStats
 }
 
-// MemoryStore keeps each client's token bucket in this process.
 type MemoryStore struct {
 	buckets map[string]*Bucket
 	mu      sync.RWMutex
@@ -26,9 +30,10 @@ func NewMemoryStore() *MemoryStore {
 }
 
 func (s *MemoryStore) Allow(
+	_ context.Context,
 	identifier string,
 	capacity, refillRate float64,
-) (bool, float64) {
+) (bool, float64, error) {
 	s.mu.Lock()
 	bucket, exists := s.buckets[identifier]
 
@@ -48,7 +53,8 @@ func (s *MemoryStore) Allow(
 	bucket.refillRate = refillRate
 	bucket.mu.Unlock()
 
-	return bucket.take(1)
+	allowed, remaining := bucket.take(1)
+	return allowed, remaining, nil
 }
 
 func (s *MemoryStore) GetRemaining(identifier string) float64 {

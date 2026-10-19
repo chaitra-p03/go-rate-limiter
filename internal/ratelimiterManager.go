@@ -5,6 +5,7 @@ import (
 	"log"
 	"sync/atomic"
 	"time"
+	"context"
 )
 
 type RatelimiterManager struct {
@@ -25,20 +26,45 @@ func NewRatelimiterManagerWithStore(store Store) *RatelimiterManager {
 	}
 }
 
-func (rl *RatelimiterManager) Allow(
+func (rl *RatelimiterManager) AllowContext(
+	ctx context.Context,
 	identifier string,
 	capacity, refillRate float64,
-) (bool, float64) {
+) (bool, float64, error) {
+	allowed, remaining, err := rl.store.Allow(
+		ctx,
+		identifier,
+		capacity,
+		refillRate,
+	)
+	if err != nil {
+		return false, 0, err
+	}
+
 	atomic.AddInt64(&rl.totalRequests, 1)
-
-	allowed, remaining := rl.store.Allow(identifier, capacity, refillRate)
-
 	if allowed {
 		atomic.AddInt64(&rl.allowedRequests, 1)
 	} else {
 		atomic.AddInt64(&rl.deniedRequests, 1)
 	}
 
+	return allowed, remaining, nil
+}
+
+// temporarily for existing callers that expect two return values.
+func (rl *RatelimiterManager) Allow(
+	identifier string,
+	capacity, refillRate float64,
+) (bool, float64) {
+	allowed, remaining, err := rl.AllowContext(
+		context.Background(),
+		identifier,
+		capacity,
+		refillRate,
+	)
+	if err != nil {
+		return false, 0
+	}
 	return allowed, remaining
 }
 
